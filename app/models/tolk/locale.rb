@@ -134,9 +134,7 @@ module Tolk
       existing_ids = self.translations.all(:select => 'tolk_translations.phrase_id').map(&:phrase_id).uniq
       phrases = phrases.scoped(:conditions => ['tolk_phrases.id NOT IN (?)', existing_ids]) if existing_ids.present?
 
-      result = phrases.paginate({:page => page}.merge(options))
-      Tolk::Phrase.send :preload_associations, result, :translations
-      result
+      phrases.page(page).scoped(options).includes(:translations)
     end
 
     def search_phrases(query, scope, page = nil, options = {})
@@ -151,7 +149,7 @@ module Tolk
 
       phrases = Tolk::Phrase.scoped(:order => 'tolk_phrases.key ASC')      
       phrases = phrases.scoped(:conditions => ['tolk_phrases.id IN(?)', translations.map(&:phrase_id).uniq])
-      phrases.paginate({:page => page}.merge(options))
+      phrases.page(page).scoped(options)
     end
     
     def search_phrases_without_translation(query, page = nil, options = {})
@@ -163,9 +161,7 @@ module Tolk
       existing_ids = self.translations.all(:select => 'tolk_translations.phrase_id').map(&:phrase_id).uniq
       phrases = phrases.scoped(:conditions => ['tolk_phrases.id NOT IN (?) AND tolk_phrases.id IN(?)', existing_ids, found_translations_ids]) if existing_ids.present?
 
-      result = phrases.paginate({:page => page}.merge(options))
-      Tolk::Phrase.send :preload_associations, result, :translations
-      result
+      phrases.page(page).scoped(options).includes(:translations)
     end
 
     def to_hash
@@ -219,11 +215,9 @@ module Tolk
     end
 
     def find_phrases_with_translations(page, conditions = {})
-      result = Tolk::Phrase.paginate(:page => page,
+      result = Tolk::Phrase.page(page).includes(:translations).scoped(
         :conditions => { :'tolk_translations.locale_id' => self.id }.merge(conditions),
         :joins => :translations, :order => 'tolk_phrases.key ASC')
-
-      Tolk::Phrase.send :preload_associations, result, :translations
 
       result.each do |phrase|
         phrase.translation = phrase.translations.for(self)
